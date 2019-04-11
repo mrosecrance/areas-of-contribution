@@ -1,0 +1,34 @@
+<script>
+
+var gitRefs = {
+  response: [{
+    "ref": "refs/heads/release-0.1",
+    "node_id": "MDM6UmVmMTQ3Mzg3OTkxOnJlbGVhc2UtMC4x",
+    "url": "https://api.github.com/repos/pivotal-cf/areas-of-contribution/git/refs/heads/release-0.1"
+,
+    "object": {
+      "sha": "38fb3f7dda6c50484b8844ecd0c8105f8ed7e0ca",
+      "type": "commit",
+      "url": "https://api.github.com/repos/pivotal-cf/areas-of-contribution/git/commits/38fb3f7dda6c50484b8844ecd0c8105f8ed7e0ca"
+    }
+  }],
+  releases: function() { return this.response.map(r => r.ref.replace("refs/heads/", "")); }
+}
+
+function getAvailableGitRefs() {
+ return gitRefs.releases();
+}
+
+const gitHubConfig = {
+  apiBase: "https://api.github.com",
+  orgAndRepo: "pivotal-cf/areas-of-contribution",
+  refPrefix: "release-"
+}
+
+function refreshGitRefs() {
+  const url = gitHubConfig.apiBase + "/repos/" + gitHubConfig.orgAndRepo + "/git/refs/heads/" + gitHubConfig.refPrefix;
+  fetch(url).then(r => r.json()).then(responseData => { gitRefs.response = responseData });
+}
+
+
+</script>

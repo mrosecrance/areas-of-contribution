@@ -1,0 +1,139 @@
+<script>
+const config = {
+  baseUrl: "https://raw.githubusercontent.com/pivotal-cf/areas-of-contribution/",
+  makeUrl : function(relativePath) {
+    return this.baseUrl + getSelectedGitBranch() + "/" + relativePath;
+  }
+}
+
+const urls = {
+  areas: config.makeUrl("yaml/areas.yaml"),
+  skills: config.makeUrl("yaml/skills.yaml"),
+  sharedContent: config.makeUrl("yaml/form/shared-content.yaml")
+}
+
+function fetchYaml(url) {
+  return fetch(url).then(resp => resp.text()).then(text => {
+    return [jsyaml.safeLoad(text), text]
+  })
+}
+
+
+
+const sharedContent = fetchYaml(urls.sharedContent).then(([sharedContent, rawYaml]) => {
+    $("#sharedContent-yaml").text(rawYaml);
+    return sharedContent;
+});
+   
+const targetAreas = fetchYaml(urls.areas).then(([data, raw]) => {
+      $('#targetAreas-yaml').text(raw);
+      return data;
+});
+
+const targetSkills = fetchYaml(urls.skills).then(([data, raw]) => {
+      $('#targetSkills-yaml').text(raw);
+      return data;
+});
+  
+function getFormSectionTitle(a) {
+  return a.form ? a.form.title : a.title;
+}
+
+const expectedFormStructure = Promise.all([sharedContent, targetAreas]).then(([sC, tA]) => {
+    const eS = constructExpectedStructure(sC, tA.areas.map(getFormSectionTitle));
+    $("#formExpectedStructure-yaml").text(jsyaml.safeDump(eS, { noRefs: true, noArrayIndent: true }));
+    return eS;
+});
+
+const expectedFormContent = Promise.all([targetAreas, targetSkills]).then(([desiredAreas, desiredSkills]) => {
+  function isBasic(s) { return s.level == "p1" || s.level == "p2" }
+  const desiredContent = desiredAreas.areas.map(a => {
+    return {
+      title: getFormSectionTitle(a),
+      description: a.description,
+      basicSkills: desiredSkills.skills.filter(s => isBasic(s)).filter(s => s.area === a.id).map(s => s.description),
+      advancedSkills: desiredSkills.skills.filter(s => !isBasic(s)).filter(s => s.area === a.id).map(s => s.description),
+    }});
+  $('#formExpectedContent-yaml').text(jsyaml.safeDump(desiredContent));
+  return desiredContent;
+});
+
+const expectedSheetContent = Promise.all([targetAreas, targetSkills]).then(([areas, skills]) => {
+  var byAreas = {};
+  areas.areas.map(a => {
+    byAreas[getSheetTitle(a)] = skills.skills.filter(s => s.area === a.id).map(s => { return { level: s.level, description: s.description}; });
+  });
+  $('#sheetExpectedContent-yaml').text(jsyaml.safeDump(byAreas));
+  return byAreas;
+});
+
+const beforeUserInput = Promise.all([sharedContent, targetAreas, targetSkills, expectedFormStructure, expectedFormContent, expectedSheetContent]).then(a => {
+  Prism.highlightAll();
+  return a;
+});
+
+function rowToSkill(row) {
+  return { level: row[1].toLowerCase(), description: row[0].substring(2,row[0].length-1) };
+}
+
+function extractActualContentFromSheetSpec(sheetSpec) {
+  var byAreas = {};
+  Object.entries(sheetSpec.breakdownPages).map(([areaName, {rows: rows}]) => {
+    byAreas[areaName] = rows.map(rowToSkill);
+  });
+  return byAreas;
+}
+
+
+function processActualSheetSpec(resp) {
+  $('#sheetActualSpec-yaml').text(jsyaml.safeDump(resp, {flowLevel: 4}));
+  const actualSheetContent = extractActualContentFromSheetSpec(resp);
+  $('#sheetActualContent-yaml').text(jsyaml.safeDump(actualSheetContent));
+  beforeUserInput.then(([sharedContent, targetAreas, targetSkills, expectedFormStructure, expectedFormContent, expectedSheetContent]) => {
+    const errors = validateStructure(expectedSheetContent, actualSheetContent, "");
+    $('#sheetContentDiffs-yaml').text(jsyaml.safeDump(errors));
+    
+    
+    $('#formVsSheetActualContentDiffs-yaml').text();
+    
+  }).then(Prism.highlightAll);
+}
+
+function processActualFormSpec(actualFormSpec) {
+  $('#formActualSpec-yaml').text(jsyaml.safeDump(actualFormSpec));
+  beforeUserInput.then(([sharedContent, targetAreas, targetSkills, expectedFormStructure, expectedFormContent]) => {   
+    const structureErrors = validateStructure(expectedFormStructure, actualFormSpec, "");
+    if (structureErrors.length > 0) {
+      const errMsg = "errors: <ul><li>" + structureErrors.join("</li>\n<li>") + "</li></ul>";
+      setStatusMessage({error: errMsg });
+      return
+    } else {
+      setStatusMessage({success: "structure validation: success"});
+    }
+  
+    const actualContent = extractActualContentFromFormSpec(actualFormSpec);
+    $('#formActualContent-yaml').text(jsyaml.safeDump(actualContent));
+    
+    const mismatches = validateContent(expectedFormContent, actualContent);
+    $('#contentDiffs-yaml').text(jsyaml.safeDump(mismatches));
+    
+    if (mismatches.length > 0) {
+      setStatusMessage({error: "content mismatches!" });
+    } else {
+      setStatusMessage({success: "content validation: success"});
+    }
+    
+  }).then(Prism.highlightAll);
+}
+
+
+function getSheetTitle(a) {
+  return a.sheet ? a.sheet.title : a.title;
+}
+
+
+
+
+</script>
+
+

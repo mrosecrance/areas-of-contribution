@@ -1,0 +1,165 @@
+<script>
+// Prevent forms from submitting.
+function preventFormSubmit() {
+  var forms = document.querySelectorAll('form');
+  for (var i = 0; i < forms.length; i++) {
+    forms[i].addEventListener('submit', function(event) {
+      event.preventDefault();
+    });
+  }
+}
+window.addEventListener('load', preventFormSubmit);
+
+var clipboard = new ClipboardJS('#clip-btn');
+
+function setFormEnabled(enabled) {
+  document.getElementById("form-fields").disabled=!enabled;      
+}
+
+function onFailure(error) {
+  setFormEnabled(true);
+  setStatusMessage({error: "<b>Error</b>: <i>" + error.message
+    + "</i><p>Contact <a href='https://github.com/pivotal-cf/feedback-and-evaluation/blob/master/MAINTAINERS'>a maintainer</a> for troubleshooting." });
+}
+
+function setStatusMessage(status) {
+   if ("success" in status) {
+       document.getElementById("output-error").hidden = true;
+       document.getElementById("output-progress").hidden = true;
+       document.getElementById("output-success").hidden = false;
+       document.getElementById("output-success").innerHTML = status["success"]
+   } else if ("progress" in status) {
+       document.getElementById("output-error").hidden = true;
+       document.getElementById("output-progress").hidden = false;
+       document.getElementById("output-success").hidden = true;
+       document.getElementById("output-progress").innerHTML = status["progress"]
+   } else if ("error" in status) {
+       document.getElementById("output-error").hidden = false;
+       document.getElementById("output-progress").hidden = true;
+       document.getElementById("output-success").hidden = true;
+       document.getElementById("output-error").innerHTML = status["error"]
+   } else {
+       document.getElementById("output-error").hidden = true;
+       document.getElementById("output-progress").hidden = true;
+       document.getElementById("output-success").hidden = true;
+   }
+}
+
+function isEditLink(url) {
+  var ok = url.startsWith("https://docs.google.com/forms/d/") && url.includes("/edit");
+  if (ok) {
+    return true
+  }
+
+  setStatusMessage({error: "Please provide the <b>Edit URL</b> for the form.  It's behind the [🖋]? icon in the <i>top-right corner of the form</i>." });
+  return false
+}
+
+function validate() {
+  const formUrl = $("input[name=feedbackFormUrl]").val();
+  if (!isEditLink(formUrl)) {
+    return
+  }
+  
+  setFormEnabled(false);
+  
+  setStatusMessage({progress: '<span>Starting update, please wait...   this may take up to 2 MINUTES!</span>' +
+    '<span class="p-3"><progress /> </span>'});
+  
+  google.script.run.withFailureHandler(onFailure).withSuccessHandler(onGetFormSpecSuccess).getFormSpec(formUrl);
+  google.script.run.withFailureHandler(onFailure).withSuccessHandler(onGetSheetSpecSuccess).getSheetSpec(formUrl);
+}
+
+function onGetFormSpecSuccess(formSpec) {
+    var dateString = new Date().toString();
+    setFormEnabled(true);
+    setStatusMessage({success: "Successfully parsed at " + dateString});
+    processActualFormSpec(formSpec);
+}
+
+function onGetSheetSpecSuccess(sheetSpec) {
+    setStatusMessage({progress: "Parsed at sheet, still working on the form..." + '<span class="p-3"><progress />'});
+    processActualSheetSpec(sheetSpec);
+}
+
+
+function updateEmailField(receivedText) {
+   document.getElementById('email').innerHTML = receivedText;
+}
+
+function onLoad() {
+   var emailField = document.getElementById('email')
+   google.script.run.withFailureHandler(onFailure).withSuccessHandler(updateEmailField).getUserEmail();
+   
+   const tabs = [
+    {id: "sharedContent", title: "Shared Content", init: "# shared content will load here"},
+    {id: "targetAreas", title: "Target Areas", init: "# target area definitions from AoC will load here"},
+    {id: "targetSkills", title: "Target Skills", init: "# target skill definitions from AoC will load here"},
+    {id: "formExpectedStructure", title: "Form: Expected Structure", init: "# expected form structure will load here"},
+    {id: "formExpectedContent", title: "Form: Expected Content", init: "# expected form content will load here"},
+    {id: "formActualSpec", title: "Form: Actual Spec", init: "# actual form spec will load here"},
+    {id: "formActualContent", title: "Form: Actual Content", init: "# actual form content will load here"},
+    {id: "contentDiffs", title: "Content Diffs", init: "# differences between desired and actual form will appear here"},
+    {id: "sheetActualSpec", title: "Sheet: Actual Spec", init: "# actual sheet spec will load here"},
+    {id: "sheetActualContent", title: "Sheet: Actual Content", init: "# actual sheet content will load here"},
+    {id: "sheetExpectedContent", title: "Sheet: Expected Content", init: "# expected sheet content will load here"},
+    {id: "sheetContentDiffs", title: "Sheet: Content Diffs", init: "# differences between desired and actual sheet will appear here"},
+    {id: "formVsSheetActualContentDiffs", title: "Form vs Sheet: Actual Content Diffs", init: "# differences between actual form and sheet contents"}    
+   ];
+   const tabHeaderTemplate = '<li class="nav-item"><a class="nav-link" id="ID-tab" data-toggle="tab" href="#ID" role="tab" aria-controls="ID" aria-selected="false">TITLE</a></li>';
+   const tabContentTemplate = '<div class="tab-pane fade" id="ID" role="tabpanel" aria-labelledby="ID-tab"><pre><code class="language-yaml" id="ID-yaml">INIT</code></pre></div>';
+   tabs.forEach(t => {
+     $("#myTabList").append(tabHeaderTemplate.replace(/ID/g, t.id).replace(/TITLE/g, t.title));
+     $("#myTabContent").append(tabContentTemplate.replace(/ID/g, t.id).replace(/INIT/g, t.init));
+   });
+   $(".nav-link").first().attr("aria-selected", "true").addClass("active");
+   $(".tab-pane").first().addClass("show active");
+   
+   getAvailableGitRefs().forEach(r => {
+     $("#gitRefSelect").append('<option value="REF">REF</option>'.replace(/REF/g, r));
+   });
+   
+   reloadFromGit();
+}
+
+onLoad();
+
+function setVisible(jq, visible) {
+  visible ? jq.removeClass("invisible") : jq.addClass("invisible");
+}
+
+function getSelectedGitBranch() {
+  return $("#gitRefSelect :selected").val();
+}
+
+function reloadFromGit() {
+  $("#gitRefLink").attr("href", "https://github.com/pivotal-cf/areas-of-contribution/compare/" + getSelectedGitBranch());
+}
+
+function onFormUrlUpdate(textInput) {
+   setFormEnabled(false);
+   if (!isEditLink(textInput.value)) {
+     setFormEnabled(true);
+     setVisible($('#form-title-raw'), false);
+     setVisible($('#form-url-hint'), true);
+     return
+   }
+   google.script.run.withFailureHandler(function(error) { 
+       $('#form-title-raw').text("");
+       setVisible($('#form-title-raw'), false);
+       setVisible($('#form-url-hint'), true);
+       setStatusMessage({error: "<b>Error</b>:" + error.message});
+       setFormEnabled(true);
+   }).withSuccessHandler(function(resp) {
+     setVisible($('#form-title-raw'), true);
+     
+     $('#form-title-raw').text("Form: " + resp.formTitle + "\nSheet: " + resp.sheetTitle);
+     setVisible($('#form-url-hint'), false);
+
+     setStatusMessage({});
+     setFormEnabled(true);
+   }).getFormAndSheetMetadata(textInput.value);      
+}
+
+</script>
+
