@@ -1,0 +1,4 @@
+# parsed with https://github.com/micromatch/anymatch
+#
+**/test/**
+**/node_modules/**
