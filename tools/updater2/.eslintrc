@@ -1,0 +1,10 @@
+{
+  "globals": {
+    "FormApp": false,
+    "SpreadsheetApp": false,
+    "HtmlService": false
+  },
+  "rules": {
+    "no-console": "off"
+  }
+}

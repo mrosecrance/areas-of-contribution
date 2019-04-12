@@ -1,0 +1,6 @@
+**/**
+node_modules/**/.*/**
+!build/server.js
+!build/index.html
+!build/_.js
+!appsscript.json

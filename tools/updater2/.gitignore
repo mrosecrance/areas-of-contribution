@@ -1,0 +1,7 @@
+*.log
+.*.swp
+.DS_store
+.clasp.json
+appsscript.json
+build
+node_modules/

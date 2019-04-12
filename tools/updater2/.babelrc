@@ -1,0 +1,9 @@
+{
+  "presets": ["@babel/env"],
+  "plugins": [
+    "@babel/transform-member-expression-literals",
+    "@babel/transform-property-literals",
+    "@babel/proposal-object-rest-spread",
+    "lodash"
+  ]
+}
