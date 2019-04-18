@@ -8,7 +8,6 @@ function preventFormSubmit() {
     });
   }
 }
-window.addEventListener('load', preventFormSubmit);
 
 function setFormEnabled(enabled) {
   document.getElementById("form-fields").disabled=!enabled;      
@@ -19,6 +18,12 @@ function onFailure(error) {
   setStatusMessage({error: "<b>Error</b>: <i>" + error.message
     + "</i><p>Contact <a href='https://github.com/pivotal-cf/feedback-and-evaluation/blob/master/MAINTAINERS'>a maintainer</a> for troubleshooting." });
 }
+
+function onSuccess(message) {
+    setFormEnabled(true);
+    setStatusMessage({success: message});
+}
+
 
 function setStatusMessage(status) {
    if ("success" in status) {
@@ -53,32 +58,24 @@ function isEditLink(url) {
   return false
 }
 
-function onUpdateSuccess(updateResult, structuredChanges) {
-    setStatusMessage({success: "Successfully updated."});
-    console.log(updateResult);
-}
-
 function updateEmailField(receivedText) {
    document.getElementById('email').innerHTML = receivedText;
 }
 
 function onLoad() {
+   window.addEventListener('load', preventFormSubmit);
+
    var emailField = document.getElementById('email')
    google.script.run.withFailureHandler(onFailure).withSuccessHandler(updateEmailField).getUserEmail();
    
    const tabs = [
-    {id: "sharedContent", title: "Shared Content", init: "# shared content will load here"},
-    {id: "targetAreas", title: "Target Areas", init: "# target area definitions from AoC will load here"},
-    {id: "targetSkills", title: "Target Skills", init: "# target skill definitions from AoC will load here"},
-    {id: "formExpectedStructure", title: "Form: Expected Structure", init: "# expected form structure will load here"},
-    {id: "formExpectedContent", title: "Form: Expected Content", init: "# expected form content will load here"},
-    {id: "formActualSpec", title: "Form: Actual Spec", init: "# actual form spec will load here"},
-    {id: "formActualContent", title: "Form: Actual Content", init: "# actual form content will load here"},
-    {id: "contentDiffs", title: "Form: Content Diffs", init: "# differences between desired and actual form will appear here"},
-    {id: "sheetActualSpec", title: "Sheet: Actual Spec", init: "# actual sheet spec will load here"},
-    {id: "sheetActualContent", title: "Sheet: Actual Content", init: "# actual sheet content will load here"},
-    {id: "sheetExpectedContent", title: "Sheet: Expected Content", init: "# expected sheet content will load here"},
-    {id: "sheetContentDiffs", title: "Sheet: Content Diffs", init: "# differences between desired and actual sheet will appear here"},
+    {id: "migrateFromAreas", title: "Migrate From: Areas", init: "# starting area definitions will load here"},
+    {id: "migrateFromSkills", title: "Migrate From: Skills", init: "# starting skill definitions will load here"},
+    {id: "migrateToAreas", title: "Migrate To: Areas", init: "# ending area definitions will load here"},
+    {id: "migrateToSkills", title: "Migrate To: Skills", init: "# ending skill definitions will load here"},
+    {id: "origResponseSheetCols", title: "Original: Response Sheet Columns", init: "# original response sheet column headers will load here"},
+    {id: "origForm", title: "Original: Form", init: "# original form spec will load here"},
+    {id: "planFormEdits", title: "Plan: Form Edits", init: "# edits to the form will load here"},
    ];
    const tabHeaderTemplate = '<li class="nav-item"><a class="nav-link" id="ID-tab" data-toggle="tab" href="#ID" role="tab" aria-controls="ID" aria-selected="false">TITLE</a></li>';
    const tabContentTemplate = '<div class="tab-pane fade" id="ID" role="tabpanel" aria-labelledby="ID-tab"><pre><code class="language-yaml" id="ID-yaml">INIT</code></pre></div>';
@@ -90,7 +87,10 @@ function onLoad() {
    $(".tab-pane").first().addClass("show active");
 }
 
-
+function reportYaml(id, content) {
+  $('#' + id + '-yaml').text(jsyaml.safeDump(content, {noArrayIndent: true}));
+  Prism.highlightAll();
+}
 
 function setVisible(jq, visible) {
   visible ? jq.removeClass("invisible") : jq.addClass("invisible");

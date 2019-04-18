@@ -2,141 +2,149 @@
 
 // step 1: user clicked Update button
 function update() {
-  var userState = getUserInputs();
+  var userIntent = getUserInputs();
   
-  if (!isEditLink(userState.formUrl)) {
+  if (!isEditLink(userIntent.formUrl)) {
     return
   }
   setFormEnabled(false);
-  setStatusMessage({progress: 'reading linked sheet'});
+  setStatusMessage({progress: 'reading form and sheet... this may take several minutes'});
   
-  userState.migrateFrom.areasPromise = github.fetchYaml(userState.migrateFrom.gitRef, github.files.areas);
-  userState.migrateFrom.skillsPromise = github.fetchYaml(userState.migrateFrom.gitRef, github.files.skills);
-  userState.migrateTo.areasPromise = github.fetchYaml(userState.migrateTo.gitRef, github.files.areas);
-  userState.migrateTo.skillsPromise = github.fetchYaml(userState.migrateTo.gitRef, github.files.skills);
+  
+  const contentPromises = {
+    "migrateFromAreas": userIntent.migrateFrom.areasPromise = github.fetchYaml(userIntent.migrateFrom.gitRef, github.files.areas),
+    "migrateFromSkills": userIntent.migrateFrom.skillsPromise = github.fetchYaml(userIntent.migrateFrom.gitRef, github.files.skills),
+    "migrateToAreas": userIntent.migrateTo.areasPromise = github.fetchYaml(userIntent.migrateTo.gitRef, github.files.areas),
+    "migrateToSkills": userIntent.migrateTo.skillsPromise = github.fetchYaml(userIntent.migrateTo.gitRef, github.files.skills),
+  };
+  Object.entries(contentPromises).forEach(([id, promise]) => {
+    promise.then(content => reportYaml(id, content));
+  });
 
-  // async launch getFormResponsesSheet on server
+  // async launch step 2: getCurrentState on server
   google.script.run
     .withFailureHandler(onFailure)
-    .withSuccessHandler(gotFormResponsesSheet)
-    .withUserObject(userState)
-    .getFormResponsesSheet(userState.formUrl);
+    .withSuccessHandler(gotCurrentState)
+    .withUserObject(userIntent)
+    .getCurrentState(userIntent.formUrl);
 }
 
-// step 2 is in Code.gs, getting sheet spec to validate it
+// step 2 is in Code.gs, getCurrentState
 
-// step 3: got sheet spec, validate it.
-function gotFormResponsesSheet(formResponsesSheetSpec, userState) {
+
+// step 3
+function gotCurrentState(currentState, userIntent) {
     setStatusMessage({progress: "validating sheet" })
-    userState.migrateFrom.skillsPromise.then(skills => {
+    reportYaml("origResponseSheetCols", currentState.responsesSheet.columnHeaders);
+    reportYaml("origForm", currentState.form);
     
-    });
+    migrationPromise(userIntent).then(migrationPlan => {
+      const plannedFormEdits = planFormEdits(currentState.form, migrationPlan);
+      reportYaml("planFormEdits", plannedFormEdits);
     
-    processActualSheetSpec(sheetSpec).then(mismatches => {
-      const structured = buildStructuredChanges(mismatches);
-      console.log("sheet mismatches...")
-      console.log(structured);
-      
-      // async launch fixupSheet
-      google.script.run.withFailureHandler(onFailure).withSuccessHandler(onUpdateSuccess).withUserObject(structured).updateSheet({
-        formUrl: formUrl,
-        changes: structured,
-      }); 
-    });
-    
-//    google.script.run.withFailureHandler(onFailure).withSuccessHandler(onGetFormSpecSuccess).withUserObject(sheetMismatchesPromise).getFormSpec(formUrl);
-    
-
-}
-
-
-function onGetFormSpecSuccess(formSpec, sheetMismatchesPromise) {
-    var dateString = new Date().toString();
-    setFormEnabled(true);
-    setStatusMessage({success: "Successfully parsed at " + dateString});
-    const formMismatchesPromise = processActualFormSpec(formSpec);
-    
-    Promise.all([sheetMismatchesPromise, formMismatchesPromise]).then(([sm, fm]) => {
-      if (sm.length > 0 || fm.length > 0) {
-        setStatusMessage({error: "mismatches detected!  see 'debug info' below" });
-      } else {
-        setStatusMessage({success: "validation: success"});
+      const missingColumns = detectResponseSheetMissingColumns(currentState, migrationPlan.migrateFrom.skills);
+      if (missingColumns.size > 0) {
+        onFailure({message: "form responses sheet is missing expected column " + Array.from(missingColumns).toString() });
+        return
       }
-    })
-}
-
-
-
-
-
-
-
-const sharedContent = fetchYaml(urls.sharedContent).then(([sharedContent, rawYaml]) => {
-    $("#sharedContent-yaml").text(rawYaml);
-    return sharedContent;
-});
-   
-const targetAreas = fetchYaml(urls.areas).then(([data, raw]) => {
-      $('#targetAreas-yaml').text(raw);
-      return data;
-});
-
-const targetSkills = fetchYaml(urls.skills).then(([data, raw]) => {
-      $('#targetSkills-yaml').text(raw);
-      return data;
-});
-
-function fetchAreasAndSkills(gitRef) {
-  const baseUrl = "https://raw.githubusercontent.com/pivotal-cf/areas-of-contribution/";
-  const url = fileName => baseUrl + gitRef + "/" + fileName;
-  return Promise.all([fetchYaml(url(config.fileNames.areas)), fetchYaml(url(config.fileNames.skills))]);
-}
-
-function computeRawResponseMigrations(startRef, endRef, startSkillDefs, endSkillDefs) {
-  return Promise.all([fetchAreasAndSkills(startRef), fetchAreasAndSkills(endRef)]).then(([[startAreas,startSkills],[endAreas,endSkills]]) => {
       
-    // return map[string]string from oldSkillString to newSkillString
-    // later will convert this to oldColumnIndex to newColumnIndex
-  });
+      onSuccess("planned edits, see debug info for details");
+
+      // async launch step 4: unlink, update, and re-link form
+      /*
+      google.script.run
+        .withFailureHandler(onFailure)
+        .withSuccessHandler(updatedForm)
+        .withUserObject(userState)
+        .updateForm({
+           formUrl: userIntent.formUrl,
+           changes: plannedFormEdits,
+         });  
+      */
+    });
 }
 
 
-function getFormSectionTitle(a) {
-  return a.form ? a.form.title : a.title;
+function migrationPromise(userIntent) {
+    return Promise.all([
+       userIntent.migrateFrom.areasPromise,
+       userIntent.migrateFrom.skillsPromise,
+       userIntent.migrateTo.areasPromise,
+       userIntent.migrateTo.skillsPromise,
+    ]).then(([mfA,mfS,mtA,mtS]) => {
+      return {
+        migrateFrom: { areas: mfA.areas, skills: mfS.skills },
+        migrateTo: { areas: mtA.areas, skills: mtS.skills },
+      }
+    });
 }
 
-const expectedFormStructure = Promise.all([sharedContent, targetAreas]).then(([sC, tA]) => {
-    const eS = constructExpectedStructure(sC, tA.areas.map(getFormSectionTitle));
-    $("#formExpectedStructure-yaml").text(jsyaml.safeDump(eS, { noRefs: true, noArrayIndent: true }));
-    return eS;
-});
+function detectPage(pageBreakTitle, areas) {
+  var i;
+  for (i = 0; i < areas.length; i++) {
+     const areaTitle = getFormSectionTitle(areas[i]);
+     if (pageBreakTitle === areaTitle) {
+       return { area: areas[i], basic: true };
+     } else if (pageBreakTitle === "Advanced " + areaTitle) {
+       return { area: areas[i], basic: false };
+     }
+  }
+  return null;
+}
 
-const expectedFormContent = Promise.all([targetAreas, targetSkills]).then(([desiredAreas, desiredSkills]) => {
-  function isBasic(s) { return s.level == "p1" || s.level == "p2" }
-  const desiredContent = desiredAreas.areas.map(a => {
-    return {
-      title: getFormSectionTitle(a),
-      description: a.description,
-      basicSkills: desiredSkills.skills.filter(s => isBasic(s)).filter(s => s.area === a.id).map(s => s.description),
-      advancedSkills: desiredSkills.skills.filter(s => !isBasic(s)).filter(s => s.area === a.id).map(s => s.description),
-    }});
-  $('#formExpectedContent-yaml').text(jsyaml.safeDump(desiredContent));
-  return desiredContent;
-});
+function buildCheckboxRows(page, skills) {
+  return skills
+    .filter(s => s.area === page.area.id)
+    .filter(s => (isBasic(s) === page.basic))
+    .map(s => s.description);
+}
 
-const expectedSheetContent = Promise.all([targetAreas, targetSkills]).then(([areas, skills]) => {
-  var byAreas = {};
-  areas.areas.map(a => {
-    byAreas[getSheetTitle(a)] = skills.skills.filter(s => s.area === a.id).map(s => { return { level: s.level, description: s.description}; });
+
+function planFormEdits(currentForm, migrationPlan) {
+  var edits = [];
+  
+  var currentPage;
+  currentForm.items.forEach(item => {
+    if (item.type === "PAGE_BREAK") {
+      currentPage = detectPage(item.title, migrationPlan.migrateFrom.areas);
+      return
+    }
+    if (item.type === "CHECKBOX_GRID") {
+      const expectedRows = buildCheckboxRows(currentPage, migrationPlan.migrateTo.skills);
+      if (expectedRows.length < 1) {
+        throw "error: no expected rows for " + JSON.stringify(currentPage);
+      }
+      if (!arraysAreEqual(item.rows, expectedRows)) {
+        edits.push({ id: item.id, newRows: expectedRows});
+      }
+      return
+    }
   });
-  $('#sheetExpectedContent-yaml').text(jsyaml.safeDump(byAreas));
-  return byAreas;
-});
+  // for now we only support editing skill definitions
+  return edits;
+}
 
-const beforeUserInput = Promise.all([sharedContent, targetAreas, targetSkills, expectedFormStructure, expectedFormContent, expectedSheetContent]).then(a => {
-  Prism.highlightAll();
-  return a;
-});
+function arraysAreEqual(a, b) {
+  if (a.length != b.length) {
+    return false
+  }
+  return a.every((v, i) => v === b[i]);
+}
+
+function detectResponseSheetMissingColumns(currentState, expectedSkills) {
+  const actualColumns = new Set(currentState.responsesSheet.columnHeaders);
+  const expectedColumns = new Set(expectedSkills.map(s => s.description).map(formatSkillForSheet));
+  var missingColumns = new Set();
+  expectedColumns.forEach(s => {
+      if (!actualColumns.has(s)) {
+          missingColumns.add(s);
+        }
+      });
+  return missingColumns;
+}
+
+
+function isBasic(s) { return s.level == "p1" || s.level == "p2" }
 
 function rowToSkill(row) {
   return { level: row[1].toLowerCase(), description: row[0].substring(2,row[0].length-1) };
@@ -146,76 +154,12 @@ function formatSkillForSheet(skillDescription) {
   return " [" + skillDescription + "]";
 }
 
-function extractActualContentFromSheetSpec(sheetSpec) {
-  var byAreas = {};
-  Object.entries(sheetSpec.breakdownPages).map(([areaName, {rows: rows}]) => {
-    byAreas[areaName] = rows.map(rowToSkill);
-  });
-  return byAreas;
-}
-
-
-function processActualSheetSpec(resp) {
-  $('#sheetActualSpec-yaml').text(jsyaml.safeDump(resp, {flowLevel: 4}));
-  const actualSheetContent = extractActualContentFromSheetSpec(resp);
-  $('#sheetActualContent-yaml').text(jsyaml.safeDump(actualSheetContent));
-  return beforeUserInput.then(([sharedContent, targetAreas, targetSkills, expectedFormStructure, expectedFormContent, expectedSheetContent]) => {
-    const errors = validateStructure(expectedSheetContent, actualSheetContent, "");
-    $('#sheetContentDiffs-yaml').text(jsyaml.safeDump(errors));
-    return errors;
-  }).then(x => {
-   Prism.highlightAll();
-   return x;
-  });
-}
-
-function processActualFormSpec(actualFormSpec) {
-  $('#formActualSpec-yaml').text(jsyaml.safeDump(actualFormSpec));
-  return beforeUserInput.then(([sharedContent, targetAreas, targetSkills, expectedFormStructure, expectedFormContent]) => {   
-    const structureErrors = validateStructure(expectedFormStructure, actualFormSpec, "");
-    if (structureErrors.length > 0) {
-      const errMsg = "errors: <ul><li>" + structureErrors.join("</li>\n<li>") + "</li></ul>";
-      setStatusMessage({error: errMsg });
-      return
-    } else {
-      setStatusMessage({success: "structure validation: success"});
-    }
-  
-    const actualContent = extractActualContentFromFormSpec(actualFormSpec);
-    $('#formActualContent-yaml').text(jsyaml.safeDump(actualContent));
-    
-    const mismatches = validateContent(expectedFormContent, actualContent);
-    $('#contentDiffs-yaml').text(jsyaml.safeDump(mismatches));
-    
-
-    return mismatches;
-  }).then(x => {
-    Prism.highlightAll();
-    return x;
-  });
-}
-
-
-
 function getSheetTitle(a) {
   return a.sheet ? a.sheet.title : a.title;
 }
 
-function buildStructuredChanges(mismatches) {
-  return mismatches.map(m => {
-    const [blank, area, index, key] = m.field.split(".");
-       
-    return {
-      sheetName: area,
-      row: parseInt(index) + 2,
-      column: key === "description" ? "A" : "UNKNOWN",
-      currentValue: formatSkillForSheet(m.actual),
-      newValue: formatSkillForSheet(m.expected),
-    };
- });
+function getFormSectionTitle(a) {
+  return a.form ? a.form.title : a.title;
 }
 
-
 </script>
-
-
