@@ -1,0 +1,49 @@
+<script>
+
+
+
+function buildRawResponseMigrations(startSkills, endSkills, startRawResponseColHeaders, endRawResponseColHeaders) {
+  const [startSkillsMap, endSkillsMap] = [startSkills, endSkills].map(buildSkillMap);
+  const [startColIndexMap, endColIndexMap] = [startRawResponseColHeaders, endRawResponseColHeaders].map(makeIndex);
+  
+  const skillMigrations = buildSkillMigrations(startSkills, endSkills);
+  
+  return Array.from(skillMigrations, ([id, skills]) => {
+    const { oldSkill: oldSkill, newSkill: newSkill } = skills;
+    const oldColIndex = startColIndexMap.get(formatSkillForSheet(oldSkill.description));
+    const newColIndex = endColIndexMap.get(formatSkillForSheet(newSkill.description));
+    return { srcColIndex: oldColIndex, dstColIndex: newColIndex };
+  });
+}
+
+
+
+/*
+type aocRev struct {
+  areas: [{id, title, description, sheet: { title }, form: { title }}],
+  skills: [{id, description, area, level}]
+}
+
+type rawResponseColHeaders []string
+*/
+
+function buildSkillMap(skillsList) {
+  return new Map(skillsList.map(s => [s.id, s]));
+}
+
+function buildSkillMigrations(startSkillsMap, endSkillsMap) {
+  var toMigrate = new Map();
+  startSkillsMap.forEach((oldSkill, id) => {
+    const newSkill = endSkillsMap.get(id);
+    if (newSkill) {
+      toMigrate.set(id, { oldSkill: oldSkill, newSkill: newSkill });
+    }
+  });
+  return toMigrate;
+}
+
+function makeIndex(ar) {
+  return new Map(ar.map((v,i) => [i, v]));
+}
+
+</script>
