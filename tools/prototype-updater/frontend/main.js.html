@@ -29,39 +29,42 @@ function update() {
     .getCurrentState(userIntent.formUrl);
 }
 
-// step 2 is in Code.gs, getCurrentState
-
+// step 2 is in backend/main.gs, getCurrentState
 
 // step 3
 function gotCurrentState(currentState, userIntent) {
-    setStatusMessage({progress: "validating sheet" })
+    setStatusMessage({progress: "validating current form and sheet" })
     reportYaml("origResponseSheetCols", currentState.responsesSheet.columnHeaders);
     reportYaml("origForm", currentState.form);
     
     migrationPromise(userIntent).then(migrationPlan => {
-      const plannedFormEdits = planFormEdits(currentState.form, migrationPlan);
-      reportYaml("planFormEdits", plannedFormEdits);
-    
       const missingColumns = detectResponseSheetMissingColumns(currentState, migrationPlan.migrateFrom.skills);
       if (missingColumns.size > 0) {
         onFailure({message: "form responses sheet is missing expected column " + Array.from(missingColumns).toString() });
         return
       }
       
-      onSuccess("planned edits, see debug info for details");
-
+      const plannedFormEdits = planFormEdits(currentState.form, migrationPlan);
+      reportYaml("planFormEdits", plannedFormEdits);
+    
+      setStatusMessage({progress: "updating form" })
       // async launch step 4: unlink, update, and re-link form
-      /*
       google.script.run
         .withFailureHandler(onFailure)
         .withSuccessHandler(updatedForm)
-        .withUserObject(userState)
+        .withUserObject(userIntent)
         .updateForm({
            formUrl: userIntent.formUrl,
-           changes: plannedFormEdits,
+           edits: plannedFormEdits,
          });  
-      */
     });
+}
+
+// step 4 is in backend/main.gs, updateForm
+
+// step 5
+function updatedForm(result) {
+  onSuccess("updated form: " + JSON.stringify(result));
 }
 
 
