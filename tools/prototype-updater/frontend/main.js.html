@@ -37,7 +37,7 @@ function gotCurrentState(currentState, userIntent) {
     reportYaml("origResponseSheetCols", currentState.responsesSheet.columnHeaders);
     reportYaml("origForm", currentState.form);
     
-    migrationPromise(userIntent).then(migrationPlan => {
+    migrationSpecPromise(userIntent).then(migrationPlan => {
       const missingColumns = detectResponseSheetMissingColumns(currentState, migrationPlan.migrateFrom.skills);
       if (missingColumns.size > 0) {
         onFailure({message: "form responses sheet is missing expected column " + Array.from(missingColumns).toString() });
@@ -47,20 +47,24 @@ function gotCurrentState(currentState, userIntent) {
       const plannedFormEdits = planFormEdits(currentState.form, migrationPlan);
       reportYaml("planFormEdits", plannedFormEdits);
     
+      setStatusMessage({success: "ok for now" })
+      
+      // async launch step 4: migrateFormAndSheet
       setStatusMessage({progress: "updating form" })
-      // async launch step 4: unlink, update, and re-link form
       google.script.run
         .withFailureHandler(onFailure)
         .withSuccessHandler(updatedForm)
         .withUserObject(userIntent)
-        .updateForm({
+        .migrateFormAndSheet({
            formUrl: userIntent.formUrl,
+           migrationPlan: migrationPlan,
            edits: plannedFormEdits,
-         });  
+         });
+       
     });
 }
 
-// step 4 is in backend/main.gs, updateForm
+// step 4 is in backend/main.gs, migrateFormAndSheet
 
 // step 5
 function updatedForm(result) {
@@ -68,7 +72,7 @@ function updatedForm(result) {
 }
 
 
-function migrationPromise(userIntent) {
+function migrationSpecPromise(userIntent) {
     return Promise.all([
        userIntent.migrateFrom.areasPromise,
        userIntent.migrateFrom.skillsPromise,
@@ -76,8 +80,8 @@ function migrationPromise(userIntent) {
        userIntent.migrateTo.skillsPromise,
     ]).then(([mfA,mfS,mtA,mtS]) => {
       return {
-        migrateFrom: { areas: mfA.areas, skills: mfS.skills },
-        migrateTo: { areas: mtA.areas, skills: mtS.skills },
+        migrateFrom: { areas: mfA.areas, skills: mfS.skills, gitRef: userIntent.migrateFrom.gitRef },
+        migrateTo: { areas: mtA.areas, skills: mtS.skills, gitRef: userIntent.migrateTo.gitRef },
       }
     });
 }

@@ -23,25 +23,71 @@ function doGet(e) {
 // step 2
 function getCurrentState(feedbackFormUrl) {
   const form = FormApp.openByUrl(feedbackFormUrl);
-  const spreadsheet = SpreadsheetApp.openById(form.getDestinationId());
-  
+  const formResponseSheet = findLinkedSheet_(form);
+
   return {
-    responsesSheet: getResponsesSheet_(form, spreadsheet),
+    responsesSheet: {
+      sheetName: formResponseSheet.getName(),
+      columnHeaders: getColumnHeaders_(formResponseSheet),
+    },
     form: getForm_(form),
   };
 }
 
 // step 4
-function updateForm(updateSpec) {
+function migrateFormAndSheet(updateSpec) {
   const form = FormApp.openByUrl(updateSpec.formUrl);
   const edits = updateSpec.edits;
-  // find existing linked response sheet
-  // unlink form from sheet
-  // update form with these edits
-  // re-link form to sheet
+  const migrationPlan = updateSpec.migrationPlan;
+  
+  const origLinkedRespSheet = findLinkedSheet_(form);
+  const sheetConfig = configLoad_(SpreadsheetApp.openById(form.getDestinationId()));
+  
+  if (sheetConfig.get("Skills repo release") !== migrationPlan.migrateFrom.gitRef) {
+    throw "migration start-version mismatch.  Sheet config has current release " + sheetConfig.get("Skills repo release")
+       + " but we're attempting to start a migration from " + migrationPlan.migrateFrom.gitRef;
+  }
+  
+  const origLinkedRespSheetName = origLinkedRespSheet.getName();
+  const destSpreadsheetId = form.getDestinationId();
+  sheetConfig.updateExisting("Last migration", "In-flight as of " + new Date());
+  
+  // unlink form
+  // this way we can make edits to the form without modifying the old response sheet
+  form.removeDestination();
+  origLinkedRespSheet.setName("Old " + origLinkedRespSheetName); 
+
+  edits.forEach(function(edit) {  
+    form.getItemById(edit.id).asCheckboxGridItem().setRows(edit.newRows);
+  });
+  
+  // relink form.  this creates a new responses sheet
+  form.setDestination(FormApp.DestinationType.SPREADSHEET, destSpreadsheetId);
+  
   // find new linked sheet
-  // extract column headers
-  // return name & column-headers about old and new response sheets
-  // so that client-side code can generate migration strategy
-  return { message: "lets pretend we did it" }
+  const newLinkedRespSheet = findLinkedSheet_(form);
+  newLinkedRespSheet.setName("Raw");
+  
+  sheetConfig.updateExisting("Raw Responses Sheet Name", newLinkedRespSheet.getName());
+  sheetConfig.updateExisting("Last migration", new Date());
+  sheetConfig.updateExisting("Skills repo release", migrationPlan.migrateTo.gitRef);
+  
+  const rawRespMigrations = buildRawResponseMigrations_(
+    migrationPlan.migrateFrom.skills,
+    migrationPlan.migrateTo.skills,
+    getColumnHeaders_(origLinkedRespSheet),
+    getColumnHeaders_(newLinkedRespSheet));
+  
+  const numRows = origLinkedRespSheet.getLastRow()-1;
+  if (numRows < 1) {
+    return { message: "no data in original raw responses sheet." };
+  }
+  
+  rawRespMigrations.forEach(function(mig) {
+    const srcRange = origLinkedRespSheet.getRange(2, mig.srcColIndex, numRows);
+    const dstColumn = newLinkedRespSheet.getRange(2, mig.dstColIndex);
+    srcRange.copyTo(dstColumn, {contentsOnly:true});
+  });
+
+  return { message: "migrated " + rawRespMigrations.length + " columns." }
 }

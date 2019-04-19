@@ -1,7 +1,5 @@
-
-
-// step 2: get the sheet spec
-function getResponsesSheet_(form, spreadsheet) {
+function findLinkedSheet_(form) {
+  const spreadsheet = SpreadsheetApp.openById(form.getDestinationId());
   const sheets = spreadsheet.getSheets();
   var linkedSheets = [];
   sheets.forEach(function(s) { 
@@ -19,15 +17,13 @@ function getResponsesSheet_(form, spreadsheet) {
     throw "too many sheets are linked to this form";
   }
   if (linkedSheets.length < 1) {
-    throw "expecting to find a sheet linked to " + formEditUrl + " but instead found " + sheets.map(function(s) { return s.getFormUrl(); }).toString();
+    throw "expecting to find one sheet linked to " + formEditUrl + " but instead found " + sheets.map(function(s) { return s.getFormUrl(); }).toString();
   }
-  const formResponseSheet = linkedSheets[0];
-   
-  const columnHeaders = trimFinalBlanks_(formResponseSheet.getRange("A1:1").getValues()[0]);
-  return {
-    sheetName: formResponseSheet.getName(),
-    columnHeaders: columnHeaders,
-  };
+  return linkedSheets[0];
+}
+
+function getColumnHeaders_(sheet) {
+  return trimFinalBlanks_(sheet.getRange("A1:1").getValues()[0]);
 }
 
 function trimFinalBlanks_(input) {
@@ -42,43 +38,71 @@ function trimFinalBlanks_(input) {
 }
 
 
-function updateSheet(updateInfo) {
-  var formUrl = updateInfo.formUrl;
-  var changes = updateInfo.changes;
-
-  var spreadsheet = SpreadsheetApp.openById(FormApp.openByUrl(formUrl).getDestinationId());
-  
-  changes.forEach(function(change) {
-    var sheet = spreadsheet.getSheetByName(change.sheetName);
-    var cell = sheet.getRange(change.column + change.row);
-    var actualValue = cell.getValue().toString();
-    if (actualValue !== change.currentValue) {
-      throw "actual value of cell doesn't match what was expected"; 
+function configLoad_(spreadsheet) {
+  const configSheet = spreadsheet.getSheetByName("Config");
+  if (!configSheet) {
+    throw "missing expected tab 'Config'.   Please upgrade to Feedback Response spreadsheet v2 before using this tool"
+  }
+  const range = configSheet.getRange("A2:B");
+  return {
+    range: range,
+    rawValues: range.getValues(),
+    get: function(key) {
+      var i;
+      for(i = 0; i<this.rawValues.length; i++) {
+        if (this.rawValues[i][0] == key) {
+          return this.rawValues[i][1];
+        }
+      }
+      throw "config key not found " + key;
+    },
+    updateExisting: function(key, value) {
+      var i;
+      for(i = 0; i<this.rawValues.length; i++) {
+        if (this.rawValues[i][0] == key) {
+          this.rawValues[i][1] = value;
+          break;
+        }
+      }
+      if (i == this.rawValues.length) {
+        throw "config key not found " + key; 
+      }
+      this.range.setValues(this.rawValues);
     }
-    //cell.setValue(change.newValue)
+  };
+}
+
+
+
+function buildRawResponseMigrations_(startSkills, endSkills, startRawResponseColHeaders, endRawResponseColHeaders) {
+  const startColIndex = makeIndex_(startRawResponseColHeaders);
+  const endColIndex = makeIndex_(endRawResponseColHeaders);
+  
+  const endSkillsDict = arrayToDict_(endSkills, function(s) { return [s.id, s] });
+  const toMigrate = startSkills.filter(function(startSkill) { return (startSkill.id in endSkillsDict); });
+  
+  return toMigrate.map(function(startSkill) {
+    const endSkill = endSkillsDict[startSkill.id];
+    return {
+      srcColIndex: startColIndex[formatSkillForSheet_(startSkill.description)],
+      dstColIndex: endColIndex[formatSkillForSheet_(endSkill.description)],
+    };
   });
-  return changes;
 }
 
-function isBreakdownPage_(sheet) {
-  var name = sheet.getName();
-  var headers = getA1B1(sheet);
-  return (headers[0] === name) && (headers[1] === "Skill Level");
+function formatSkillForSheet_(skillDescription) {
+  return " [" + skillDescription + "]";
 }
 
-function isRawResponsePage_(sheet) {
-  var headers = getA1B1(sheet);
-  return (headers[0] === "Timestamp") && (headers[1] === "Email Address");
+function makeIndex_(ar) {
+  return arrayToDict_(ar, function(el, i) { return [el, i] });
 }
 
-function getA1B1_(sheet) {
-  return sheet.getRange("A1:B1").getValues()[0];
-}
-
-function isNonEmptyRow_(row) {
-  return row.every(function(cell) { return (cell !== "") });
-}
-
-function skillFromRow_(row) {
-  return { description: row[0], level: row[1] }
+function arrayToDict_(arrayElements, getKeyAndValue) {
+  var dict = {}
+  arrayElements.map(getKeyAndValue).forEach(function(kv) {
+    const [key,val] = kv;
+    dict[key] = val;
+  })
+  return dict;
 }
