@@ -72,37 +72,118 @@ function configLoad_(spreadsheet) {
   };
 }
 
-
-
-function buildRawResponseMigrations_(startSkills, endSkills, startRawResponseColHeaders, endRawResponseColHeaders) {
-  const startColIndex = makeIndex_(startRawResponseColHeaders);
-  const endColIndex = makeIndex_(endRawResponseColHeaders);
+function migrateRawResponses_(migrationPlan, origLinkedRespSheet, newLinkedRespSheet) {
+  const plan = planRawResponseMigrations_(
+    migrationPlan,
+    getColumnHeaders_(origLinkedRespSheet),
+    getColumnHeaders_(newLinkedRespSheet));
   
-  const endSkillsDict = arrayToDict_(endSkills, function(s) { return [s.id, s] });
-  const toMigrate = startSkills.filter(function(startSkill) { return (startSkill.id in endSkillsDict); });
+  const numRows = origLinkedRespSheet.getLastRow()-1;
+  if (numRows < 1) {
+    return { message: "no data in original raw responses sheet." };
+  }
   
-  return toMigrate.map(function(startSkill) {
-    const endSkill = endSkillsDict[startSkill.id];
-    return {
-      srcColIndex: startColIndex[formatSkillForSheet_(startSkill.description)],
-      dstColIndex: endColIndex[formatSkillForSheet_(endSkill.description)],
-    };
+  plan.forEach(function(mig) {
+    if (typeof mig.srcColIndex !== "number") {
+      throw "expected srcColIndex to be number, instead was " + mig.srcColIndex;
+    }
+    const srcRange = origLinkedRespSheet.getRange(2, mig.srcColIndex, numRows);
+    const dstColumn = newLinkedRespSheet.getRange(2, mig.dstColIndex);
+    srcRange.copyTo(dstColumn);
   });
+  
+  return plan;
+}
+
+
+// returns mapping from old column to new column
+function planRawResponseMigrations_(migrationPlan, startRawResponseColHeaders, endRawResponseColHeaders) {
+  const startColIndex = makeColumnHeaderIndex_(startRawResponseColHeaders);
+  const endColIndex = makeColumnHeaderIndex_(endRawResponseColHeaders);
+  
+  function toColumnIndicies_(hdrMigrations) {
+    return hdrMigrations.map(function(m) {
+      const ret = { 
+        srcColIndex: startColIndex[m.srcColHeader],
+        dstColIndex: endColIndex[m.dstColHeader]
+      };
+      if ((ret.srcColIndex > 0) && (ret.dstColIndex > 0)) {
+        return ret;
+      }
+      throw "unabled to find indicies for column headers: " + JSON.stringify(m);
+    });
+  }
+  
+  const metadataColumnsToMigrate = [1,2,3,4].map(function(i) { return { srcColIndex: i, dstColIndex: i }; });
+  const skillColumnsToMigrate = toColumnIndicies_(planMigrationSkills_(migrationPlan));
+  const additionalContextColumnsToMigrate = toColumnIndicies_(planMigrationAdditionalContext_(migrationPlan));
+
+  return metadataColumnsToMigrate.concat(additionalContextColumnsToMigrate).concat(skillColumnsToMigrate);
+}
+
+function planMigrationAdditionalContext_(migrationPlan) {
+  return planMigrationColHeaders_(
+    migrationPlan.migrateFrom.areas,
+    migrationPlan.migrateTo.areas,
+    function(area) { return formatAdditionalContextTitle_(areaTitleForForm_(area)); }  // form title, not sheet title
+  ).concat(planMigrationColHeaders_(
+    migrationPlan.migrateFrom.areas,
+    migrationPlan.migrateTo.areas,
+    function(area) { return formatAdditionalContextTitle_("Advanced " + areaTitleForForm_(area)); }  // form title, not sheet title
+  ));
+}
+
+function planMigrationSkills_(migrationPlan) {
+  return planMigrationColHeaders_(
+    migrationPlan.migrateFrom.skills,
+    migrationPlan.migrateTo.skills,
+    function(skill) { return formatSkillForSheet_(skill.description); }
+  );
+}
+
+function planMigrationColHeaders_(startItems, endItems, getColHeader) {
+  const endDict = arrayToDict_(endItems, function(i) { return [i.id, i] });
+  const toMigrate = startItems.filter(function(i) { return (i.id in endDict); });
+  return toMigrate.map(function(startItem) {
+    return {
+      srcColHeader: getColHeader(startItem),
+      dstColHeader: getColHeader(endDict[startItem.id])
+    };
+  });  
+}
+
+function buildNewSkillsTable_(migrateTo) {
+  const areasDict = arrayToDict_(migrateTo.areas, function(area) { return [area.id, area] });
+  
+  return migrateTo.skills.map(function(skill) {
+    const area = areaTitleForSheet_(areasDict[skill.area]);
+    const desc = formatSkillForSheet_(skill.description);
+    const level = skill.level.toUpperCase();
+    return [area, desc, level];
+  });
+}
+            
+            
+function areaTitleForSheet_(a) {
+  return a.sheet ? a.sheet.title : a.title;
+}
+
+function areaTitleForForm_(a) {
+  return a.form ? a.form.title : a.title;
 }
 
 function formatSkillForSheet_(skillDescription) {
   return " [" + skillDescription + "]";
 }
 
-function makeIndex_(ar) {
-  return arrayToDict_(ar, function(el, i) { return [el, i] });
+function makeColumnHeaderIndex_(headerStrings) {
+  return arrayToDict_(headerStrings, function(s, i) { return [s, i+1] });
 }
 
 function arrayToDict_(arrayElements, getKeyAndValue) {
   var dict = {}
   arrayElements.map(getKeyAndValue).forEach(function(kv) {
-    const [key,val] = kv;
-    dict[key] = val;
+    dict[kv[0]] = kv[1];
   })
   return dict;
 }

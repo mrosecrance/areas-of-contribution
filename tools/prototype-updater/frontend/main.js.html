@@ -40,7 +40,7 @@ function gotCurrentState(currentState, userIntent) {
     migrationSpecPromise(userIntent).then(migrationPlan => {
       const missingColumns = detectResponseSheetMissingColumns(currentState, migrationPlan.migrateFrom.skills);
       if (missingColumns.size > 0) {
-        onFailure({message: "form responses sheet is missing expected column " + Array.from(missingColumns).toString() });
+        onFailure({message: "Current sheet doesn't match expected current version: form responses sheet is missing expected column " + Array.from(missingColumns).toString() });
         return
       }
       

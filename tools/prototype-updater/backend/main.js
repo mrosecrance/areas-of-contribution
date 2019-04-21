@@ -41,22 +41,37 @@ function migrateFormAndSheet(updateSpec) {
   const migrationPlan = updateSpec.migrationPlan;
   
   const origLinkedRespSheet = findLinkedSheet_(form);
-  const sheetConfig = configLoad_(SpreadsheetApp.openById(form.getDestinationId()));
+  const spreadsheet = SpreadsheetApp.openById(form.getDestinationId());
+  const sheetConfig = configLoad_(spreadsheet);
   
   if (sheetConfig.get("Skills repo release") !== migrationPlan.migrateFrom.gitRef) {
-    throw "migration start-version mismatch.  Sheet config has current release " + sheetConfig.get("Skills repo release")
+    throw "migration start-version mismatch.  Spreadsheet tab 'Config' claims 'Skills repo release' is " + sheetConfig.get("Skills repo release")
        + " but we're attempting to start a migration from " + migrationPlan.migrateFrom.gitRef;
   }
   
   const origLinkedRespSheetName = origLinkedRespSheet.getName();
   const destSpreadsheetId = form.getDestinationId();
   sheetConfig.updateExisting("Last migration", "In-flight as of " + new Date());
+
+  // rename additional-context item titles so each one is unique
+  // we do this before unlinking, so that we can migrate them by their unique title
+  updateContextItemTitles_(form);
+  
+  // stop accepting responses while we migrate
+  const wasAcceptingResponses = form.isAcceptingResponses();
+  form.setAcceptingResponses(false);
   
   // unlink form
-  // this way we can make edits to the form without modifying the old response sheet
+  // this way we can make further edits to the form without modifying the old response sheet
   form.removeDestination();
   origLinkedRespSheet.setName("Old " + origLinkedRespSheetName); 
 
+  // delete all form responses, since we're treating the sheet as the source of truth
+  // we don't want the new sheet to get populated with existing responses, since the
+  // data copied from the old sheet may not be in the same order.
+  form.deleteAllResponses();
+
+  // edit the form
   edits.forEach(function(edit) {  
     form.getItemById(edit.id).asCheckboxGridItem().setRows(edit.newRows);
   });
@@ -68,26 +83,22 @@ function migrateFormAndSheet(updateSpec) {
   const newLinkedRespSheet = findLinkedSheet_(form);
   newLinkedRespSheet.setName("Raw");
   
+  // migrate data
+  const migrationResult = migrateRawResponses_(migrationPlan, origLinkedRespSheet, newLinkedRespSheet);
+
+  const skillsSheet = spreadsheet.getSheetByName("Skills");
+  skillsSheet.getRange("A2:C").setValues(buildNewSkillsTable_(migrationPlan.migrateTo));
+  
+  // update config
   sheetConfig.updateExisting("Raw Responses Sheet Name", newLinkedRespSheet.getName());
   sheetConfig.updateExisting("Last migration", new Date());
   sheetConfig.updateExisting("Skills repo release", migrationPlan.migrateTo.gitRef);
   
-  const rawRespMigrations = buildRawResponseMigrations_(
-    migrationPlan.migrateFrom.skills,
-    migrationPlan.migrateTo.skills,
-    getColumnHeaders_(origLinkedRespSheet),
-    getColumnHeaders_(newLinkedRespSheet));
+  // re-allow responses now that migration is complete
+  form.setAcceptingResponses(wasAcceptingResponses);
   
-  const numRows = origLinkedRespSheet.getLastRow()-1;
-  if (numRows < 1) {
-    return { message: "no data in original raw responses sheet." };
-  }
-  
-  rawRespMigrations.forEach(function(mig) {
-    const srcRange = origLinkedRespSheet.getRange(2, mig.srcColIndex, numRows);
-    const dstColumn = newLinkedRespSheet.getRange(2, mig.dstColIndex);
-    srcRange.copyTo(dstColumn, {contentsOnly:true});
-  });
-
-  return { message: "migrated " + rawRespMigrations.length + " columns." }
+  return { message: "migrated " + migrationResult.length + " columns." }
 }
+
+
+

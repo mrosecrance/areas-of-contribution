@@ -4,6 +4,23 @@ function setIfNotEmpty_(obj, fieldName, fieldValue) {
   }
 }
 
+function updateContextItemTitles_(form) {
+  var currentPageTitle;
+  form.getItems().forEach(function(item) {
+    if (item.getType() === FormApp.ItemType.PAGE_BREAK) {
+      currentPageTitle = item.getTitle();
+      return
+    }
+    if (item.getType() !== FormApp.ItemType.PARAGRAPH_TEXT) {
+      return;
+    }
+    item.asParagraphTextItem().setTitle(formatAdditionalContextTitle_(currentPageTitle));
+  });
+}
+
+function formatAdditionalContextTitle_(pageTitle) {
+  return "Additional context: " + pageTitle; 
+}
 
 function getForm_(form) {
   return {
