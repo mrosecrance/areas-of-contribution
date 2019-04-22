@@ -8,11 +8,14 @@ function getUserEmail() {
 }
 
 function getFormAndSheetMetadata(feedbackFormUrl) {
-  var form = FormApp.openByUrl(feedbackFormUrl);
-  var sheet = SpreadsheetApp.openById(form.getDestinationId());
+  const form = FormApp.openByUrl(feedbackFormUrl);
+  const sheet = SpreadsheetApp.openById(form.getDestinationId());
+  const sheetConfig = configLoad_(sheet);
+  
   return {
     formTitle: form.getTitle(),
     sheetTitle: sheet.getName(),
+    skillsVersion: sheetConfig.get(configOption_SkillsRepoRelease),
   };
 }
 
@@ -44,15 +47,21 @@ function migrateFormAndSheet(updateSpec) {
   const spreadsheet = SpreadsheetApp.openById(form.getDestinationId());
   const sheetConfig = configLoad_(spreadsheet);
   
-  if (sheetConfig.get("Skills repo release") !== migrationPlan.migrateFrom.gitRef) {
-    throw "migration start-version mismatch.  Spreadsheet tab 'Config' claims 'Skills repo release' is " + sheetConfig.get("Skills repo release")
+  if (sheetConfig.get(configOption_SkillsRepoRelease) !== migrationPlan.migrateFrom.gitRef) {
+    throw "migration start-version mismatch.  Spreadsheet tab 'Config' claims '" 
+        + configOption_SkillsRepoRelease + "' is " + sheetConfig.get(configOption_SkillsRepoRelease)
        + " but we're attempting to start a migration from " + migrationPlan.migrateFrom.gitRef;
   }
   
   const origLinkedRespSheetName = origLinkedRespSheet.getName();
   const destSpreadsheetId = form.getDestinationId();
-  sheetConfig.updateExisting("Last migration", "In-flight as of " + new Date());
-
+  sheetConfig.updateExisting(configOption_LastMigration, "In-flight as of " + new Date());
+  sheetConfig.updateExisting(configOption_SkillsRepoRelease,
+                             "In-flight from " 
+                             + migrationPlan.migrateFrom.gitRef 
+                             + " to " 
+                             + migrationPlan.migrateTo.gitRef);
+  
   // rename additional-context item titles so each one is unique
   // we do this before unlinking, so that we can migrate them by their unique title
   updateContextItemTitles_(form);
@@ -88,11 +97,11 @@ function migrateFormAndSheet(updateSpec) {
 
   const skillsSheet = spreadsheet.getSheetByName("Skills");
   skillsSheet.getRange("A2:C").setValues(buildNewSkillsTable_(migrationPlan.migrateTo));
-  
+
   // update config
-  sheetConfig.updateExisting("Raw Responses Sheet Name", newLinkedRespSheet.getName());
-  sheetConfig.updateExisting("Last migration", new Date());
-  sheetConfig.updateExisting("Skills repo release", migrationPlan.migrateTo.gitRef);
+  sheetConfig.updateExisting(configOption_rawResponsesSheetName, newLinkedRespSheet.getName());
+  sheetConfig.updateExisting(configOption_LastMigration, new Date());
+  sheetConfig.updateExisting(configOption_SkillsRepoRelease, migrationPlan.migrateTo.gitRef);
   
   // re-allow responses now that migration is complete
   form.setAcceptingResponses(wasAcceptingResponses);

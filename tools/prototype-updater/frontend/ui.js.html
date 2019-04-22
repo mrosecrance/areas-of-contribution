@@ -108,6 +108,7 @@ function onFormUrlUpdate(textInput) {
        $('#form-title-raw').text("");
        setVisible($('#form-title-raw'), false);
        setVisible($('#form-url-hint'), true);
+       $('#gitRefMigrateFrom').removeClass("inferredFromSheet");
        setStatusMessage({error: "<b>Error</b>:" + error.message});
        setFormEnabled(true);
    }).withSuccessHandler(function(resp) {
@@ -116,6 +117,8 @@ function onFormUrlUpdate(textInput) {
      $('#form-title-raw').text("Form: " + resp.formTitle + "\nSheet: " + resp.sheetTitle);
      setVisible($('#form-url-hint'), false);
 
+     $('#gitRefMigrateFrom').val(resp.skillsVersion);
+     $('#gitRefMigrateFrom').addClass("inferredFromSheet");
      setStatusMessage({});
      setFormEnabled(true);
    }).getFormAndSheetMetadata(textInput.value);      
@@ -125,8 +128,8 @@ function onFormUrlUpdate(textInput) {
 function getUserInputs() {
   return {
     formUrl: $("input[name=feedbackFormUrl]").val(),
-    migrateFrom: { gitRef: $("#gitRefMigrateFrom").text() },
-    migrateTo: { gitRef: $("#gitRefMigrateTo").text() },
+    migrateFrom: { gitRef: $("#gitRefMigrateFrom").val() },
+    migrateTo: { gitRef: $("#gitRefMigrateTo").val() },
   };
 }
 </script>
