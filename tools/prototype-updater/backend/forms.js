@@ -4,6 +4,11 @@ function setIfNotEmpty_(obj, fieldName, fieldValue) {
   }
 }
 
+function updateLandingPageText(form) {
+  const msg = 'Please take a moment to review "How to interpret Frequency and Impact" at this URL: https://github.com/pivotal-cf/areas-of-contribution#how-to-interpret-frequency--impact'
+  form.setDescription(msg);
+}
+
 function updateContextItemTitles_(form) {
   var currentPageTitle;
   form.getItems().forEach(function(item) {

@@ -66,6 +66,9 @@ function migrateFormAndSheet(updateSpec) {
   // we do this before unlinking, so that we can migrate them by their unique title
   updateContextItemTitles_(form);
   
+  // set landing page text
+  updateLandingPageText(form);
+  
   // stop accepting responses while we migrate
   const wasAcceptingResponses = form.isAcceptingResponses();
   form.setAcceptingResponses(false);
