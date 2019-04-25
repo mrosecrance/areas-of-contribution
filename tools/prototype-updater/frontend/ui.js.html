@@ -121,6 +121,8 @@ function onFormUrlUpdate(textInput) {
        setVisible($('#form-url-hint'), true);
        $('#gitRefMigrateFrom').removeClass("inferredFromSheet");
        setStatusMessage({error: "<b>Error</b>:" + error.message});
+       clearAllYaml();
+       setUpdateEnabled(true);
        setFormEnabled(true);
    }).withSuccessHandler(function(resp) {
      setVisible($('#form-title-raw'), true);

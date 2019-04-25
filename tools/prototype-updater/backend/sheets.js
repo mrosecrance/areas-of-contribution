@@ -190,15 +190,36 @@ function planMigrationColHeaders_(startItems, endItems, getColHeader) {
   });  
 }
 
-function buildNewSkillsTable_(migrateTo) {
-  const areasDict = arrayToDict_(migrateTo.areas, function(area) { return [area.id, area] });
+// ensures formulas on row 1 are copied all the way down to the last row
+// then trims the rows
+function refillBreakdownPage_(sheet) {
+   const firstRow = sheet.getRange("D2:2");
+   const toFill = sheet.getRange("D2:24");
   
-  return migrateTo.skills.map(function(skill) {
-    const area = areaTitleForSheet_(areasDict[skill.area]);
-    const desc = formatSkillForSheet_(skill.description);
-    const level = skill.level.toUpperCase();
-    return [area, desc, level];
+  firstRow.autoFill(toFill, SpreadsheetApp.AutoFillSeries.DEFAULT_SERIES);
+  trimRows_(sheet);
+}
+
+function trimRows_(sheet) {
+  if (sheet.getLastRow() < sheet.getMaxRows()) {
+    sheet.deleteRows(sheet.getLastRow()+1,sheet.getMaxRows()-sheet.getLastRow());
+  } 
+}
+
+function refillAllBreakdownPages_(spreadsheet, areas) {
+  areas.forEach(function(area) {
+    const sheetName = areaTitleForSheet_(area);
+    const sheet = spreadsheet.getSheetByName(sheetName);
+    refillBreakdownPage_(sheet);
   });
+}
+
+function trimSkillsTab_(spreadsheet, skills) {
+  const sheet = spreadsheet.getSheetByName("Skills");
+  const numRowsToKeep = skills.length + 1;
+  if (numRowsToKeep < sheet.getMaxRows()) {
+    sheet.deleteRows(numRowsToKeep+1,sheet.getMaxRows()-numRowsToKeep);
+  }
 }
             
             

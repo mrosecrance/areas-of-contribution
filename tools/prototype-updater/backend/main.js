@@ -114,8 +114,16 @@ function migrateFormAndSheet(updateSpec) {
  
   // this causes Skills tab to reload
   sheetConfig.updateExisting(configOption_SkillsRepoRelease, migrationPlan.migrateTo.gitRef);
+
+  // keep it short, no errors  
+  trimSkillsTab_(spreadsheet, migrationPlan.migrateTo.skills);
+  
   // this causes the breakdown pages and impact summary to reload
   sheetConfig.updateExisting(configOption_rawResponsesSheetName, newLinkedRespSheet.getName());
+  
+  // ensure breakdown pages have all formulas in all rows
+  refillAllBreakdownPages_(spreadsheet, migrationPlan.migrateTo.areas);
+  
   
   // save metadata
   sheetConfig.updateExisting(configOption_LastMigration, new Date());
