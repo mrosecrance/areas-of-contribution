@@ -81,9 +81,13 @@ function migrateRawResponses_(migrationPlan, origLinkedRespSheet, newLinkedRespS
     getColumnHeaders_(origLinkedRespSheet),
     getColumnHeaders_(newLinkedRespSheet));
   
+  if (!(plan.length > 3)) {
+    throw "planned raw response migrations is too short"; 
+  }
+  
   const numRows = origLinkedRespSheet.getLastRow()-1;
   if (numRows < 1) {
-    return { message: "no data in original raw responses sheet." };
+    return "no data in original raw responses sheet to migrate.";
   }
   
   plan.forEach(function(mig) {
@@ -95,7 +99,7 @@ function migrateRawResponses_(migrationPlan, origLinkedRespSheet, newLinkedRespS
     srcRange.copyTo(dstColumn);
   });
   
-  return plan;
+  return "migrated " + numRows + " responses across " + plan.length + " columns";
 }
 
 
@@ -113,7 +117,7 @@ function planRawResponseMigrations_(migrationPlan, startRawResponseColHeaders, e
       if ((ret.srcColIndex > 0) && (ret.dstColIndex > 0)) {
         return ret;
       }
-      throw "unabled to find indicies for column headers: " + JSON.stringify(m);
+      throw "unable to find indicies for column headers: " + JSON.stringify(m);
     });
   }
   

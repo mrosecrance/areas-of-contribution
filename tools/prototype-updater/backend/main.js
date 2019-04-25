@@ -66,17 +66,20 @@ function migrateFormAndSheet(updateSpec) {
   // we do this before unlinking, so that we can migrate them by their unique title
   updateContextItemTitles_(form);
   
+
   // set landing page text
   updateLandingPageText(form);
   
   // stop accepting responses while we migrate
   const wasAcceptingResponses = form.isAcceptingResponses();
   form.setAcceptingResponses(false);
+
+  // TODO: don't unlink until these changes propogate to the google sheet!
   
   // unlink form
   // this way we can make further edits to the form without modifying the old response sheet
   form.removeDestination();
-  origLinkedRespSheet.setName("Old " + origLinkedRespSheetName); 
+  origLinkedRespSheet.setName("Old Responses as of " + (new Date()).toISOString()); 
 
   // delete all form responses, since we're treating the sheet as the source of truth
   // we don't want the new sheet to get populated with existing responses, since the
@@ -109,8 +112,7 @@ function migrateFormAndSheet(updateSpec) {
   // re-allow responses now that migration is complete
   form.setAcceptingResponses(wasAcceptingResponses);
   
-  return { message: "migrated " + migrationResult.length + " columns." }
+  return { message: "migration successful", details: migrationResult };
 }
-
 
 
