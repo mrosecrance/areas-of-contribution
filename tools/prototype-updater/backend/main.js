@@ -64,9 +64,9 @@ function migrateFormAndSheet(updateSpec) {
   
   // rename additional-context item titles so each one is unique
   // we do this before unlinking, so that we can migrate them by their unique title
+  // these changes take some time to propogate to the sheet though, so we'l wait below
   updateContextItemTitles_(form);
   
-
   // set landing page text
   updateLandingPageText(form);
   
@@ -74,7 +74,14 @@ function migrateFormAndSheet(updateSpec) {
   const wasAcceptingResponses = form.isAcceptingResponses();
   form.setAcceptingResponses(false);
 
-  // TODO: don't unlink until these changes propogate to the google sheet!
+  // don't unlink until these changes propogate to the google sheet!
+  var tries = 0;
+  while(!sheetHasCorrectAdditionalContextHeaders_(origLinkedRespSheet, migrationPlan.migrateFrom.areas)) {
+    sleep(1000);
+    if (tries++ > 5) {
+      throw "raw response sheet never received updated column headers.  aborting."
+    }
+  }
   
   // unlink form
   // this way we can make further edits to the form without modifying the old response sheet

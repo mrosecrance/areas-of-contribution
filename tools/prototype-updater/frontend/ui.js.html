@@ -13,6 +13,10 @@ function setFormEnabled(enabled) {
   document.getElementById("form-fields").disabled=!enabled;      
 }
 
+function setUpdateEnabled(enabled) {
+  $("[type=button]").prop("disabled", !enabled);
+}
+
 function onFailure(error) {
   setFormEnabled(true);
   setStatusMessage({error: "<b>Error</b>: <i>" + error.message
@@ -84,7 +88,8 @@ function onLoad() {
      $("#myTabContent").append(tabContentTemplate.replace(/ID/g, t.id).replace(/INIT/g, t.init));
    });
    $(".nav-link").first().attr("aria-selected", "true").addClass("active");
-   $(".tab-pane").first().addClass("show active");
+   $(".tab-pane").first().addClass("show active");  
+   $("[name=feedbackFormUrl]").on('focusin',  function() { setUpdateEnabled(false); });
 }
 
 function reportYaml(id, content) {
@@ -120,6 +125,7 @@ function onFormUrlUpdate(textInput) {
      $('#gitRefMigrateFrom').val(resp.skillsVersion);
      $('#gitRefMigrateFrom').addClass("inferredFromSheet");
      setStatusMessage({});
+     setUpdateEnabled(true);
      setFormEnabled(true);
    }).getFormAndSheetMetadata(textInput.value);      
 }

@@ -22,6 +22,17 @@ function findLinkedSheet_(form) {
   return linkedSheets[0];
 }
 
+// form item changes can take a while to propogate to the sheet
+// this function tests if the change to the Additional Context headers have updated
+function sheetHasCorrectAdditionalContextHeaders_(sheet, areas) {
+  const colHeaderIndex = makeColumnHeaderIndex_(getColumnHeaders_(sheet));
+  return areas.every(function(area) {
+   const basic = additionalContextTitle_basic_(area);
+   const advanced = additionalContextTitle_advanced_(area);
+   return colHeaderIndex[basic] && colHeaderIndex[advanced];
+  });
+}
+
 function getColumnHeaders_(sheet) {
   return trimFinalBlanks_(sheet.getRange("A1:1").getValues()[0]);
 }
@@ -127,16 +138,25 @@ function planRawResponseMigrations_(migrationPlan, startRawResponseColHeaders, e
 
   return metadataColumnsToMigrate.concat(additionalContextColumnsToMigrate).concat(skillColumnsToMigrate);
 }
+  
+function additionalContextTitle_basic_(area) {
+  return formatAdditionalContextTitle_(areaTitleForForm_(area)); // form title, not sheet title
+}
+
+function additionalContextTitle_advanced_(area) {
+  return formatAdditionalContextTitle_("Advanced " + areaTitleForForm_(area)); // form title, not sheet title
+}
+
 
 function planMigrationAdditionalContext_(migrationPlan) {
   return planMigrationColHeaders_(
     migrationPlan.migrateFrom.areas,
     migrationPlan.migrateTo.areas,
-    function(area) { return formatAdditionalContextTitle_(areaTitleForForm_(area)); }  // form title, not sheet title
+    additionalContextTitle_basic_
   ).concat(planMigrationColHeaders_(
     migrationPlan.migrateFrom.areas,
     migrationPlan.migrateTo.areas,
-    function(area) { return formatAdditionalContextTitle_("Advanced " + areaTitleForForm_(area)); }  // form title, not sheet title
+    additionalContextTitle_advanced_
   ));
 }
 
