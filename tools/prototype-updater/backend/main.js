@@ -53,6 +53,9 @@ function migrateFormAndSheet(updateSpec) {
        + " but we're attempting to start a migration from " + migrationPlan.migrateFrom.gitRef;
   }
   
+  // if there's an error here, then abort
+  assertSkillsMatch_(spreadsheet);
+  
   const origLinkedRespSheetName = origLinkedRespSheet.getName();
   const destSpreadsheetId = form.getDestinationId();
   sheetConfig.updateExisting(configOption_LastMigration, "In-flight as of " + new Date());
@@ -108,14 +111,15 @@ function migrateFormAndSheet(updateSpec) {
   // migrate data
   const migrationResult = migrateRawResponses_(migrationPlan, origLinkedRespSheet, newLinkedRespSheet);
 
-  const skillsSheet = spreadsheet.getSheetByName("Skills");
-  skillsSheet.getRange("A2:C").setValues(buildNewSkillsTable_(migrationPlan.migrateTo));
-
-  // update config
-  sheetConfig.updateExisting(configOption_rawResponsesSheetName, newLinkedRespSheet.getName());
-  sheetConfig.updateExisting(configOption_LastMigration, new Date());
+ 
+  // this causes Skills tab to reload
   sheetConfig.updateExisting(configOption_SkillsRepoRelease, migrationPlan.migrateTo.gitRef);
+  // this causes the breakdown pages and impact summary to reload
+  sheetConfig.updateExisting(configOption_rawResponsesSheetName, newLinkedRespSheet.getName());
   
+  // save metadata
+  sheetConfig.updateExisting(configOption_LastMigration, new Date());
+
   // re-allow responses now that migration is complete
   form.setAcceptingResponses(wasAcceptingResponses);
   

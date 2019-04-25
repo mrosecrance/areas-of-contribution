@@ -52,6 +52,17 @@ var configOption_SkillsRepoRelease = "Skills repo release";
 var configOption_LastMigration = "Last migration";
 var configOption_rawResponsesSheetName = "Raw Responses Sheet Name";
 
+function assertSkillsMatch_(spreadsheet) {
+  const configSheet = spreadsheet.getSheetByName("Config");
+  if (!configSheet) {
+    throw "missing expected tab 'Config'.   Please upgrade to Feedback Response spreadsheet v2 before using this tool"
+  }
+  const status = configSheet.getRange("C4").getValue().toString();
+  if (status !== "Ok") {
+    throw "Spreadsheet is not correctly set up.  Resolve error in Config sheet: " + status;
+  }
+}
+
 function configLoad_(spreadsheet) {
   const configSheet = spreadsheet.getSheetByName("Config");
   if (!configSheet) {

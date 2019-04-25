@@ -66,13 +66,7 @@ function updateEmailField(receivedText) {
    document.getElementById('email').innerHTML = receivedText;
 }
 
-function onLoad() {
-   window.addEventListener('load', preventFormSubmit);
-
-   var emailField = document.getElementById('email')
-   google.script.run.withFailureHandler(onFailure).withSuccessHandler(updateEmailField).getUserEmail();
-   
-   const tabs = [
+const tabs = [
     {id: "migrateFromAreas", title: "Migrate From: Areas", init: "# starting area definitions will load here"},
     {id: "migrateFromSkills", title: "Migrate From: Skills", init: "# starting skill definitions will load here"},
     {id: "migrateToAreas", title: "Migrate To: Areas", init: "# ending area definitions will load here"},
@@ -80,7 +74,14 @@ function onLoad() {
     {id: "origResponseSheetCols", title: "Original: Response Sheet Columns", init: "# original response sheet column headers will load here"},
     {id: "origForm", title: "Original: Form", init: "# original form spec will load here"},
     {id: "planFormEdits", title: "Plan: Form Edits", init: "# edits to the form will load here"},
-   ];
+];
+   
+function onLoad() {
+   window.addEventListener('load', preventFormSubmit);
+
+   var emailField = document.getElementById('email')
+   google.script.run.withFailureHandler(onFailure).withSuccessHandler(updateEmailField).getUserEmail();
+   
    const tabHeaderTemplate = '<li class="nav-item"><a class="nav-link" id="ID-tab" data-toggle="tab" href="#ID" role="tab" aria-controls="ID" aria-selected="false">TITLE</a></li>';
    const tabContentTemplate = '<div class="tab-pane fade" id="ID" role="tabpanel" aria-labelledby="ID-tab"><pre><code class="language-yaml" id="ID-yaml">INIT</code></pre></div>';
    tabs.forEach(t => {
@@ -94,6 +95,11 @@ function onLoad() {
 
 function reportYaml(id, content) {
   $('#' + id + '-yaml').text(jsyaml.safeDump(content, {noArrayIndent: true}));
+  Prism.highlightAll();
+}
+
+function clearAllYaml() {
+  tabs.forEach(t =>  $('#' + t.id + '-yaml').text(t.init));
   Prism.highlightAll();
 }
 
@@ -125,6 +131,7 @@ function onFormUrlUpdate(textInput) {
      $('#gitRefMigrateFrom').val(resp.skillsVersion);
      $('#gitRefMigrateFrom').addClass("inferredFromSheet");
      setStatusMessage({});
+     clearAllYaml();
      setUpdateEnabled(true);
      setFormEnabled(true);
    }).getFormAndSheetMetadata(textInput.value);      
