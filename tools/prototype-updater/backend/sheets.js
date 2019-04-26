@@ -197,12 +197,9 @@ function refillBreakdownPage_(sheet) {
    const toFill = sheet.getRange("D2:24");
   
   firstRow.autoFill(toFill, SpreadsheetApp.AutoFillSeries.DEFAULT_SERIES);
-  trimRows_(sheet);
-}
-
-function trimRows_(sheet) {
-  if (sheet.getLastRow() < sheet.getMaxRows()) {
-    sheet.deleteRows(sheet.getLastRow()+1,sheet.getMaxRows()-sheet.getLastRow());
+  const lastSkillRow = sheet.getRange("A1:A").getLastRow();
+  if (lastSkillRow < sheet.getMaxRows()) {
+    sheet.deleteRows(lastSkillRow+1,sheet.getMaxRows()-lastSkillRow);
   } 
 }
 
