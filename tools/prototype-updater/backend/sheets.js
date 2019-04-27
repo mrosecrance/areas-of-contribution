@@ -211,14 +211,30 @@ function refillAllBreakdownPages_(spreadsheet, areas) {
   });
 }
 
-function trimSkillsTab_(spreadsheet, skills) {
-  const sheet = spreadsheet.getSheetByName("Skills");
-  const numRowsToKeep = skills.length + 1;
-  if (numRowsToKeep < sheet.getMaxRows()) {
-    sheet.deleteRows(numRowsToKeep+1,sheet.getMaxRows()-numRowsToKeep);
-  }
+function buildNewSkillsTable_(migrateTo) {
+  const areasDict = arrayToDict_(migrateTo.areas, function(area) { return [area.id, area] });
+  
+  return migrateTo.skills.map(function(skill) {
+    const area = areaTitleForSheet_(areasDict[skill.area]);
+    const desc = formatSkillForSheet_(skill.description);
+    const level = skill.level.toUpperCase();
+    return [area, desc, level];
+  });
 }
-            
+
+
+function regenerateSkillsTab_(spreadsheet, migrateTo) {
+  const skillsSheet = spreadsheet.getSheetByName("Skills");
+  const newSkillsTable = buildNewSkillsTable_(migrateTo);
+  const rowsToAdd = newSkillsTable.length + 1 - skillsSheet.getMaxRows();
+  if (rowsToAdd > 0) {
+    skillsSheet.insertRowsAfter(skillsSheet.getMaxRows(), rowsToAdd);
+  } else if (rowsToAdd < 0) {
+   skillsSheet.deleteRows(newSkillsTable.length + 1, -rowsToAdd);
+  }
+  
+  skillsSheet.getRange("A2:C").setValues(newSkillsTable);
+}
             
 function areaTitleForSheet_(a) {
   return a.sheet ? a.sheet.title : a.title;

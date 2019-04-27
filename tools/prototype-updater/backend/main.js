@@ -80,7 +80,7 @@ function migrateFormAndSheet(updateSpec) {
   // don't unlink until these changes propogate to the google sheet!
   var tries = 0;
   while(!sheetHasCorrectAdditionalContextHeaders_(origLinkedRespSheet, migrationPlan.migrateFrom.areas)) {
-    sleep(1000);
+    Utilities.sleep(1000);
     if (tries++ > 5) {
       throw "raw response sheet never received updated column headers.  aborting."
     }
@@ -111,12 +111,9 @@ function migrateFormAndSheet(updateSpec) {
   // migrate data
   const migrationResult = migrateRawResponses_(migrationPlan, origLinkedRespSheet, newLinkedRespSheet);
 
- 
-  // this causes Skills tab to reload
+  // rebuild skills tab and update release version in Config
+  regenerateSkillsTab_(spreadsheet, migrationPlan.migrateTo);
   sheetConfig.updateExisting(configOption_SkillsRepoRelease, migrationPlan.migrateTo.gitRef);
-
-  // keep it short, no errors  
-  trimSkillsTab_(spreadsheet, migrationPlan.migrateTo.skills);
   
   // this causes the breakdown pages and impact summary to reload
   sheetConfig.updateExisting(configOption_rawResponsesSheetName, newLinkedRespSheet.getName());
