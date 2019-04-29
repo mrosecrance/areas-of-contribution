@@ -34,7 +34,7 @@ skills:
 - id: saaa0d80d
   description: Is comfortable with rotating pairs frequently -- moved from p1 to p2
   area: technical-execution
-  level: p1
+  level: p2
 - id: s0bc6a381
   description: Fits engineering chore work into existing feature work
   area: technical-execution
@@ -412,13 +412,6 @@ skills:
     architecture)
   area: project-leadership
   level: p1
-- id: s1e24c45c
-  description: >-
-    Is responsible for creating and upholding team discipline. This includes setting an example of
-    following team processes themselves, holding other team members accountable, and fostering a
-    culture of providing open and honest feedback about team’s artifacts (product, repos, process.)
-  area: project-leadership
-  level: p2
 - id: s2e68f242
   description: >-
     Continually reflects on ways to reduce the tribal knowledge on their team, and evolves the on
@@ -453,6 +446,13 @@ skills:
   description: >-
     Able to anchor teams with emerging product priorities and technical direction. They are able to
     help identify unknowns, and work with leadership to resolve them.
+  area: project-leadership
+  level: p3
+- id: s1e24c45c
+  description: >-
+    Is responsible for creating and upholding team discipline. This includes setting an example of
+    following team processes themselves, holding other team members accountable, and fostering a
+    culture of providing open and honest feedback about team’s artifacts (product, repos, process.) -- moving from p2 to p3
   area: project-leadership
   level: p3
 - id: s94c92c62
