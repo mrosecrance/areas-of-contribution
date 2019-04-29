@@ -15,10 +15,6 @@ skills:
   description: Actively participates in pointing well-defined stories
   area: technical-execution
   level: p1
-- id: saaa0d80d
-  description: Is comfortable with rotating pairs frequently
-  area: technical-execution
-  level: p1
 - id: se5ed278d
   description: Is comfortable with carrying context on well-defined stories
   area: technical-execution
@@ -35,6 +31,10 @@ skills:
   description: 'Participates in writing acceptance criteria for well-scoped stories, when necessary'
   area: technical-execution
   level: p2
+- id: saaa0d80d
+  description: Is comfortable with rotating pairs frequently -- moved from p1 to p2
+  area: technical-execution
+  level: p1
 - id: s0bc6a381
   description: Fits engineering chore work into existing feature work
   area: technical-execution
@@ -63,10 +63,6 @@ skills:
   level: p3
 - id: s70f975f0
   description: De-risks and makes progress on tracks with uncertain implementation
-  area: technical-execution
-  level: p3
-- id: s0b9d5f23
-  description: Works with PM + Design to scope epics to buildable blocks
   area: technical-execution
   level: p3
 - id: s7d8c80a2
@@ -305,6 +301,10 @@ skills:
   level: p5
 - id: s8d1ab0e6
   description: Communicates clearly and kindly with team mates
+  area: collaboration
+  level: p1
+- id: s727682c9
+  description: Actively monitors how much they speak in meetings relative to others
   area: collaboration
   level: p1
 - id: s727682c5
